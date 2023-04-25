@@ -1,6 +1,11 @@
-from Drone_physic import *
+import pymunk
+import pymunk.pygame_util
+from pymunk import Vec2d
+import numpy as np
+import pygame
 
-import Drone_physic as Drone
+import Drone2D_ENV_forRL_with_Uncertainty_env.Drone_physic as Drone
+import Drone2D_ENV_forRL_with_Uncertainty_env.Event_handler as Event_handler
 
 import gymnasium as gym
 from gymnasium import spaces
@@ -9,19 +14,30 @@ import numpy as np
 import random
 import os
 
-class Drone2dEnv(gym.Env):
+class Drone2dEnv_with_uncertainty(gym.Env):
+    metadata = {"render_modes": ["human"], "render_fps": 60}
     """
     render_sim: (bool) if true, a graphic is generated
     render_path: (bool) if true, the drone's path is drawn
     render_shade: (bool) if true, the drone's shade is drawn
     shade_distance: (int) distance between consecutive drone's shades
-    n_steps: (int) number of time steps
-    n_fall_steps: (int) the number of initial steps for which the drone can't do anything
-    change_target: (bool) if true, mouse click change target positions
-    initial_throw: (bool) if true, the drone is initially thrown with random force
+    time_in_second: (int) number of second before truncation
+    Sensor_noise_level: (string) the level of noise in the sensor in observation (none, low, medium, or high)
+    Actuator_noise_level: (string) the level of noise in the motor thrust (none, low, medium, high)
+    Environmental_disturbance: (string) the presence of wind in the environment (none, constant, random)
     """
 
-    def __init__(self, render_sim=False, n_steps=500,):
+    def __init__(
+            self, 
+            render_sim=False, 
+            render_path = False, 
+            render_shade = False,
+            shade_distance = 10,
+            time_in_second = 15,
+            Sensor_noise_level = "none",
+            Actuator_noise_level = "none",
+            Environmental_disturbance = "none"
+            ):
 
         self.render_sim = render_sim
         self.render_path = render_path
@@ -33,27 +49,53 @@ class Drone2dEnv(gym.Env):
             self.drop_path = []
             self.path_drone_shade = []
 
-        self.init_pymunk()
+        self.init_Drone()
 
-        #Parameters
-        self.max_time_steps = n_steps
-        self.stabilisation_delay = n_fall_steps
+        # #Parameters
+        self.max_time_steps = time_in_second * 60
         self.drone_shade_distance = shade_distance
-        self.froce_scale = 1000
-        self.initial_throw = initial_throw
-        self.change_target = change_target
+        # self.froce_scale = 1000
+
 
         #Initial values
         self.first_step = True
-        self.done = False
+        self.terminated = False
+        self.truncated = False
         self.info = {}
         self.current_time_step = 0
         self.left_force = -1
         self.right_force = -1
 
         #Generating target position
-        self.x_target = random.uniform(50, 750)
-        self.y_target = random.uniform(50, 750)
+        self.landing_target = [300,500]
+
+        Sensor_noise_level.lower()
+        Sensor_noise_level.strip()
+        #Checking input for noise level for sensor
+        valid_noise_level = (Sensor_noise_level == "none" or Sensor_noise_level == "low" or 
+                            Sensor_noise_level == "medium" or Sensor_noise_level == "high")
+
+        if valid_noise_level:
+            self.Sensor_noise_level = Sensor_noise_level
+
+        Actuator_noise_level.lower()
+        Actuator_noise_level.strip()
+        #Checking input for noise level for actuator
+        valid_actuator_level = (Actuator_noise_level == "none" or Actuator_noise_level == "low" or 
+                            Actuator_noise_level == "medium" or Actuator_noise_level == "high")
+
+        if valid_actuator_level:
+            self.Actuator_noise_level = Actuator_noise_level
+
+        Environmental_disturbance.lower()
+        Environmental_disturbance.strip()
+        #Checking the input for the environmental disturbance
+        valid_disturbance_level = (Environmental_disturbance == "none" or Environmental_disturbance == "constant" or 
+                            Environmental_disturbance == "random")
+
+        if valid_disturbance_level:
+            self.Environmental_disturbance = Environmental_disturbance
+        
 
         #Defining spaces for action and observation
         min_action = np.array([-1, -1], dtype=np.float32)
@@ -90,16 +132,37 @@ class Drone2dEnv(gym.Env):
 
         #Generating drone's starting position
         random_x = random.uniform(200, 600)
-        random_y = random.uniform(200, 600)
+        random_y = random.uniform(600, 800)
         angle_rand = random.uniform(-np.pi/4, np.pi/4)
-        self.drone = Drone(random_x, random_y, angle_rand, 20, 100, 0.2, 0.4, self.space)
+        self.drone = Drone.Drone_physic(random_x, random_y, angle_rand, 16, 80, 0.8, 0.4, self.space)
 
         self.drone_radius = self.drone.drone_radius
 
     def step(self, action):
 
-        self.left_force = (action[0]/2 + 0.5) * self.froce_scale
-        self.right_force = (action[1]/2 + 0.5) * self.froce_scale
+        self.left_force = action[0]
+        self.right_force = action[1]
+
+        # noise simulation and seeding 
+        rng = np.random.default_rng(50)
+        low_sensor_noise = self.Actuator_noise_level == "low"
+        medium_sensor_noise = self.Actuator_noise_level == "medium"
+        high_sensor_noise = self.Actuator_noise_level == "high"
+
+        # low sensor noise is set to around 0.5% of full scale
+        if low_sensor_noise:
+            left_force = rng.normal(left_force, left_force * 0.005)
+            right_force = rng.normal(right_force, right_force * 0.005)
+        
+        # medium sensor noise is set to around 1% of full scale
+        if medium_sensor_noise:
+            left_force = rng.normal(left_force, left_force * 0.01)
+            right_force = rng.normal(right_force, right_force * 0.01)
+
+        # high sensor noise is set to around 5% of full scale
+        if high_sensor_noise:
+            left_force = rng.normal(left_force, left_force * 0.05)
+            right_force = rng.normal(right_force, right_force * 0.05)
 
         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, self.left_force), (-self.drone_radius, 0))
         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, self.right_force), (self.drone_radius, 0))
@@ -123,66 +186,116 @@ class Drone2dEnv(gym.Env):
 
         #Calulating reward function
         obs = self.get_observation()
-        reward = (1.0/(np.abs(obs[4])+0.1)) + (1.0/(np.abs(obs[5])+0.1))
+        velocity_x, velocity_y, angular_velocity, angle, x, y = obs
 
         #Stops episode, when drone is out of range or overlaps
-        if np.abs(obs[3])==1 or np.abs(obs[6])==1 or np.abs(obs[7])==1:
-            self.done = True
+        out_of_control = np.abs(angle) > np.pi/2
+        out_of_bound = 0 > x > 800 or 0 > y > 800
+
+        #Check the reward if they landed
+        in_landing_zone = self.landing_target[0] < x < self.landing_target[1] and 0 < y < 16
+        reasonable_landing_speed = velocity_x < 100 and velocity_x < 100 and angular_velocity < 5
+
+        if out_of_control or out_of_bound:
+            self.terminated = True
             reward = -10
 
+        elif in_landing_zone:
+            reward = 10
+            self.terminated = True
+        
+        if not reasonable_landing_speed and in_landing_zone and not (out_of_control or out_of_bound):
+            reward -= 5
+            
         #Stops episode, when time is up
         if self.current_time_step == self.max_time_steps:
-            self.done = True
+            self.truncated = True
 
-        return obs, reward, self.done, self.info
+        return obs, reward, self.terminated, self.truncated, self.info
 
     def get_observation(self):
         velocity_x, velocity_y = self.drone.frame_shape.body.velocity_at_local_point((0, 0))
-        velocity_x = np.clip(velocity_x/1330, -1, 1)
-        velocity_y = np.clip(velocity_y/1330, -1, 1)
+        # velocity_x = np.clip(velocity_x/1330, -1, 1)
+        # velocity_y = np.clip(velocity_y/1330, -1, 1)
 
         omega = self.drone.frame_shape.body.angular_velocity
-        omega = np.clip(omega/11.7, -1, 1)
+        # omega = np.clip(omega/11.7, -1, 1)
 
         alpha = self.drone.frame_shape.body.angle
-        alpha = np.clip(alpha/(np.pi/2), -1, 1)
+        # alpha = np.clip(alpha/(np.pi/2), -1, 1)
 
         x, y = self.drone.frame_shape.body.position
+        
+        # Noise simulation and rng seeding
+        rng = np.random.default_rng(50)
+        # if x < self.x_target:
+        #     distance_x = np.clip((x/self.x_target) - 1, -1, 0)
 
-        if x < self.x_target:
-            distance_x = np.clip((x/self.x_target) - 1, -1, 0)
+        # else:
+        #     distance_x = np.clip((-x/(self.x_target-800) + self.x_target/(self.x_target-800)) , 0, 1)
 
-        else:
-            distance_x = np.clip((-x/(self.x_target-800) + self.x_target/(self.x_target-800)) , 0, 1)
+        # if y < self.y_target:
+        #     distance_y = np.clip((y/self.y_target) - 1, -1, 0)
 
-        if y < self.y_target:
-            distance_y = np.clip((y/self.y_target) - 1, -1, 0)
+        # else:
+        #     distance_y = np.clip((-y/(self.y_target-800) + self.y_target/(self.y_target-800)) , 0, 1)
 
-        else:
-            distance_y = np.clip((-y/(self.y_target-800) + self.y_target/(self.y_target-800)) , 0, 1)
+        # pos_x = np.clip(x/400.0 - 1, -1, 1)
+        # pos_y = np.clip(y/400.0 - 1, -1, 1)
 
-        pos_x = np.clip(x/400.0 - 1, -1, 1)
-        pos_y = np.clip(y/400.0 - 1, -1, 1)
+        # return np.array([velocity_x, velocity_y, omega, alpha, distance_x, distance_y, pos_x, pos_y])
 
-        return np.array([velocity_x, velocity_y, omega, alpha, distance_x, distance_y, pos_x, pos_y])
+        no_sensor_noise = self.Sensor_noise_level == "none"
+        low_sensor_noise = self.Sensor_noise_level == "low"
+        medium_sensor_noise = self.Sensor_noise_level == "medium"
+        high_sensor_noise = self.Sensor_noise_level == "high"
+
+        # low sensor noise is set to around 0.5% of full scale
+        if low_sensor_noise:
+            x = rng.normal(x, 4.0)
+            y = rng.normal(y, 4.0)
+            velocity_x = rng.normal(velocity_x, 6.0)
+            velocity_y = rng.normal(velocity_y, 6.0)
+            omega = rng.normal(omega, 0.06)
+            alpha = rng.normal(alpha, 0.008)
+
+        # medium sensor noise is set to around 1% of full scale    
+        if medium_sensor_noise:
+            x = rng.normal(x, 8.0)
+            y = rng.normal(y, 8.0)
+            velocity_x = rng.normal(velocity_x, 13.3)
+            velocity_y = rng.normal(velocity_y, 13.3)
+            omega = rng.normal(omega, 0.11)
+            alpha = rng.normal(alpha, 0.0157)
+        
+        # high sensor noise is set to around 5% of full scale
+        if high_sensor_noise:
+            x = rng.normal(x, 40.0)
+            y = rng.normal(y, 40.0)
+            velocity_x = rng.normal(velocity_x, 66.5)
+            velocity_y = rng.normal(velocity_y, 66.5)
+            omega = rng.normal(omega, 0.6)
+            alpha = rng.normal(alpha, 0.08)
+
+        return np.array([velocity_x, velocity_y, omega, alpha, x, y])
 
     def render(self, mode='human', close=False):
         if self.render_sim is False: return
 
-        # pygame_events(self.space, self, self.change_target)
+        Event_handler.pygame_events(self.space, self, self.change_target)
         self.screen.fill((243, 243, 243))
         pygame.draw.rect(self.screen, (24, 114, 139), pygame.Rect(0, 0, 800, 800), 8)
         pygame.draw.rect(self.screen, (33, 158, 188), pygame.Rect(50, 50, 700, 700), 4)
         pygame.draw.rect(self.screen, (142, 202, 230), pygame.Rect(200, 200, 400, 400), 4)
 
-        #Drawing done's shade
-        # if len(self.path_drone_shade):
-        #     for shade in self.path_drone_shade:
-        #         image_rect_rotated = pygame.transform.rotate(self.shade_image, shade[2]*180.0/np.pi)
-        #         shade_image_rect = image_rect_rotated.get_rect(center=(shade[0], 800-shade[1]))
-        #         self.screen.blit(image_rect_rotated, shade_image_rect)
+        #Drawing drone's shade
+        if len(self.path_drone_shade):
+            for shade in self.path_drone_shade:
+                image_rect_rotated = pygame.transform.rotate(self.shade_image, shade[2]*180.0/np.pi)
+                shade_image_rect = image_rect_rotated.get_rect(center=(shade[0], 800-shade[1]))
+                self.screen.blit(image_rect_rotated, shade_image_rect)
 
-        # self.space.debug_draw(self.draw_options)
+        self.space.debug_draw(self.draw_options)
 
         #Drawing vectors of motor forces
         vector_scale = 0.05
@@ -214,7 +327,7 @@ class Drone2dEnv(gym.Env):
 
     def reset(self):
         self.__init__(self.render_sim, self.render_path, self.render_shade, self.drone_shade_distance,
-                      self.max_time_steps, self.stabilisation_delay, self.change_target, self.initial_throw)
+                      self.max_time_steps, )
         return self.get_observation()
 
     def close(self):
@@ -251,13 +364,13 @@ class Drone2dEnv(gym.Env):
 
     #     return {'throw_angle': throw_angle, 'throw_force': throw_force, 'throw_rotation': throw_rotation}
 
-    # def add_postion_to_drop_path(self):
-    #     x, y = self.drone.frame_shape.body.position
-    #     self.drop_path.append((x, 800-y))
+    def add_postion_to_drop_path(self):
+        x, y = self.drone.frame_shape.body.position
+        self.drop_path.append((x, 800-y))
 
-    # def add_postion_to_flight_path(self):
-    #     x, y = self.drone.frame_shape.body.position
-    #     self.flight_path.append((x, 800-y))
+    def add_postion_to_flight_path(self):
+        x, y = self.drone.frame_shape.body.position
+        self.flight_path.append((x, 800-y))
 
     def add_drone_shade(self):
         x, y = self.drone.frame_shape.body.position
@@ -268,3 +381,6 @@ class Drone2dEnv(gym.Env):
     # def change_target_point(self, x, y):
     #     self.x_target = x
     #     self.y_target = y
+
+
+# env = Drone2dEnv_with_uncertainty(render_sim=True)
