@@ -1,8 +1,13 @@
 import Drone2D_ENV_forRL_with_Uncertainty_env
 import gymnasium as gym
 
-print(gym.registry.keys())
+newenv = gym.make("Drone2D-Uncertain-v0", render_sim = True, Sensor_noise_level = "none",
+                   Actuator_noise_level = "none", Environmental_disturbance = "none")
 
-newenv = gym.make("Drone2D-Uncertain-v0")
+obs, info = newenv.reset()
 
-newenv.reset()
+
+obs, reward, truncated, terminated, info = newenv.step([1000,1000])
+obs, reward, truncated, terminated, info = newenv.step([1000,1000])
+
+print(obs)

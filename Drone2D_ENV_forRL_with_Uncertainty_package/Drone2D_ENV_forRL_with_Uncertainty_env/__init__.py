@@ -1,5 +1,5 @@
 from gymnasium.envs.registration import register
-import Drone2D_ENV_forRL_with_Uncertainty_env.Drone2dEnv_with_uncertainty
+from Drone2D_ENV_forRL_with_Uncertainty_env.Drone2dEnv_with_uncertainty import Drone2dEnv_with_uncertainty
 
 
 register(

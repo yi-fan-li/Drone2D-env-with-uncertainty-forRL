@@ -50,8 +50,8 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             self.path_drone_shade = []
 
         self.init_Drone()
-
-        # #Parameters
+        
+        # Parameters
         self.max_time_steps = time_in_second * 60
         self.drone_shade_distance = shade_distance
         # self.froce_scale = 1000
@@ -68,6 +68,9 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         #Generating target position
         self.landing_target = [300,500]
+
+        if self.render_sim == True:
+            self.render()
 
         Sensor_noise_level.lower()
         Sensor_noise_level.strip()
@@ -98,13 +101,14 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         
 
         #Defining spaces for action and observation
-        min_action = np.array([-1, -1], dtype=np.float32)
-        max_action = np.array([1, 1], dtype=np.float32)
-        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float32)
-
-        min_observation = np.array([-1, -1, -1, -1, -1, -1, -1, -1], dtype=np.float32)
-        max_observation = np.array([1, 1, 1, 1, 1, 1, 1, 1], dtype=np.float32)
-        self.observation_space = spaces.Box(low=min_observation, high=max_observation, dtype=np.float32)
+        min_action = np.array([10, 10], dtype=np.float64)
+        max_action = np.array([1000, 1000], dtype=np.float64)
+        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float64)
+        
+        # observation space (velocity_x, velocity_y, angular velocity, angle, x, y )
+        min_observation = np.array([-np.inf, -np.inf, -np.inf, -np.pi, -np.inf, -np.inf], dtype=np.float64)
+        max_observation = np.array([np.inf, np.inf, np.inf, np.pi, np.inf, np.inf], dtype=np.float64)
+        self.observation_space = spaces.Box(low=min_observation, high=max_observation, dtype=np.float64)
 
     def init_pygame(self):
         pygame.init()
@@ -173,6 +177,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Saving drone's position for drawing
         if self.first_step is True:
             if self.render_sim is True and self.render_path is True: self.add_postion_to_drop_path()
+            if self.render_sim is True and self.render_shade is True: self.add_drone_shade()
             if self.render_sim is True and self.render_path is True: self.add_postion_to_flight_path()
             self.first_step = False
 
@@ -195,6 +200,8 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Check the reward if they landed
         in_landing_zone = self.landing_target[0] < x < self.landing_target[1] and 0 < y < 16
         reasonable_landing_speed = velocity_x < 100 and velocity_x < 100 and angular_velocity < 5
+
+        reward = 0
 
         if out_of_control or out_of_bound:
             self.terminated = True
@@ -282,7 +289,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
     def render(self, mode='human', close=False):
         if self.render_sim is False: return
 
-        Event_handler.pygame_events(self.space, self, self.change_target)
+        Event_handler.pygame_events(self.space, self)
         self.screen.fill((243, 243, 243))
         pygame.draw.rect(self.screen, (24, 114, 139), pygame.Rect(0, 0, 800, 800), 8)
         pygame.draw.rect(self.screen, (33, 158, 188), pygame.Rect(50, 50, 700, 700), 4)
@@ -300,20 +307,20 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Drawing vectors of motor forces
         vector_scale = 0.05
         l_x_1, l_y_1 = self.drone.frame_shape.body.local_to_world((-self.drone_radius, 0))
-        l_x_2, l_y_2 = self.drone.frame_shape.body.local_to_world((-self.drone_radius, self.froce_scale*vector_scale))
+        l_x_2, l_y_2 = self.drone.frame_shape.body.local_to_world((-self.drone_radius, 1000*vector_scale))
         pygame.draw.line(self.screen, (179,179,179), (l_x_1, 800-l_y_1), (l_x_2, 800-l_y_2), 4)
 
         l_x_2, l_y_2 = self.drone.frame_shape.body.local_to_world((-self.drone_radius, self.left_force*vector_scale))
         pygame.draw.line(self.screen, (255,0,0), (l_x_1, 800-l_y_1), (l_x_2, 800-l_y_2), 4)
 
         r_x_1, r_y_1 = self.drone.frame_shape.body.local_to_world((self.drone_radius, 0))
-        r_x_2, r_y_2 = self.drone.frame_shape.body.local_to_world((self.drone_radius, self.froce_scale*vector_scale))
+        r_x_2, r_y_2 = self.drone.frame_shape.body.local_to_world((self.drone_radius, 1000*vector_scale))
         pygame.draw.line(self.screen, (179,179,179), (r_x_1, 800-r_y_1), (r_x_2, 800-r_y_2), 4)
 
         r_x_2, r_y_2 = self.drone.frame_shape.body.local_to_world((self.drone_radius, self.right_force*vector_scale))
         pygame.draw.line(self.screen, (255,0,0), (r_x_1, 800-r_y_1), (r_x_2, 800-r_y_2), 4)
 
-        pygame.draw.circle(self.screen, (255, 0, 0), (self.x_target, 800-self.y_target), 5)
+        # pygame.draw.circle(self.screen, (255, 0, 0), (self.x_target, 800-self.y_target), 5)
 
         #Drawing drone's path
         if len(self.flight_path) > 2:
@@ -327,8 +334,9 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
     def reset(self):
         self.__init__(self.render_sim, self.render_path, self.render_shade, self.drone_shade_distance,
-                      self.max_time_steps, )
-        return self.get_observation()
+                      self.max_time_steps/60, self.Sensor_noise_level, 
+                      self.Actuator_noise_level, self.Environmental_disturbance)
+        return self.get_observation(), self.info
 
     def close(self):
         pygame.quit()
