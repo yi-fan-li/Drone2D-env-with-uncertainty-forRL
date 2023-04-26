@@ -107,14 +107,10 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         if constant_environmental_disturbance:
             self.wind_force = self.rng.uniform(-300,300)
 
-        # initial thrust force
-        self.left_force = 500
-        self.right_force = 500
-
         #Defining spaces for action and observation
-        min_action = np.array([0, 0], dtype=int)
-        max_action = np.array([2, 2], dtype=int)
-        self.action_space = spaces.Tuple((spaces.Discrete(3), spaces.Discrete(3)))
+        min_action = np.array([200, 200], dtype=np.float64)
+        max_action = np.array([1500, 1500], dtype=np.float64)
+        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float64)
         
         # observation space (velocity_x, velocity_y, angular velocity, angle, x, y )
         min_observation = np.array([-np.inf, -np.inf, -np.inf, -np.pi, -np.inf, -np.inf], dtype=np.float64)
@@ -148,40 +144,16 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Generating drone's starting position
         random_x = random.uniform(200, 800)
         random_y = random.uniform(600, 800)
-        angle_rand = random.uniform(-np.pi/4, np.pi/4)
-        # angle_rand = 0
+        # angle_rand = random.uniform(-np.pi/4, np.pi/4)
+        angle_rand = 0
         self.drone = Drone.Drone_physic(random_x, random_y, angle_rand, 16, 80, 0.8, 0.4, self.space)
 
         self.drone_radius = self.drone.drone_radius
 
     def step(self, action):
 
-        left_up_thrust = action[0] == 0
-        left_maintain_thrust = action[0] == 1
-        left_down_thrust = action[0] == 2
-
-        right_up_thrust = action[1] == 0
-        right_maintain_thrust = action[1] == 1
-        right_down_thrust = action[1] == 2
-
-        left_thrust_inside_uplimit = self.left_force < 1405
-        left_thrust_inside_downlimit = self.left_force > 205
-        right_thrust_inside_uplimit = self.right_force < 1405
-        right_thrust_inside_downlimit = self.right_force > 205
-        
-        increment = 50
-
-        if left_up_thrust and left_thrust_inside_uplimit:
-            self.left_force += increment
-        
-        if left_down_thrust and left_thrust_inside_downlimit:
-            self.left_force -= increment
-        
-        if right_up_thrust and right_thrust_inside_uplimit:
-            self.right_force += increment
-
-        if right_down_thrust and right_thrust_inside_downlimit:
-            self.right_force -= increment
+        self.left_force = action[0]
+        self.right_force = action[1]
 
         # noise simulation and seeding 
         low_actuator_noise = self.Actuator_noise_level == "low"
@@ -190,25 +162,25 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         # low sensor noise is set to around 0.5% of full scale
         if low_actuator_noise:
-            left_force = self.rng.normal(self.left_force, self.left_force * 0.005)
-            right_force = self.rng.normal(self.right_force, self.right_force * 0.005)
+            left_force = self.rng.normal(left_force, left_force * 0.005)
+            right_force = self.rng.normal(right_force, right_force * 0.005)
         
         # medium sensor noise is set to around 1% of full scale
         if medium_actuator_noise:
-            left_force = self.rng.normal(self.left_force, self.left_force * 0.01)
-            right_force = self.rng.normal(self.right_force, self.right_force * 0.01)
+            left_force = self.rng.normal(left_force, left_force * 0.01)
+            right_force = self.rng.normal(right_force, right_force * 0.01)
 
         # high sensor noise is set to around 5% of full scale
         if high_actuator_noise:
-            left_force = self.rng.normal(self.left_force, self.left_force * 0.05)
-            right_force = self.rng.normal(self.right_force, self.right_force * 0.05)
+            left_force = self.rng.normal(left_force, left_force * 0.05)
+            right_force = self.rng.normal(right_force, right_force * 0.05)
 
-        self.left_force = np.absolute(self.left_force)
-        self.right_force = np.absolute(self.right_force)
+        left_force = np.absolute(left_force)
+        right_force = np.absolute(right_force)
 
         # get observations
         obs = self.get_observation()
-        velocity_x, velocity_y, angular_velocity, angle, x, y, obs_left_thrust, obs_right_thrust = obs
+        velocity_x, velocity_y, angular_velocity, angle, x, y = obs
 
         # apply the force of the observation
         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*self.left_force, np.cos(angle)*self.left_force), (-self.drone_radius, 0))
@@ -286,9 +258,6 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         # alpha = np.clip(alpha/(np.pi/2), -1, 1)
 
         x, y = self.drone.frame_shape.body.position
-
-        left_thrust = self.left_force
-        right_thrust = self.right_force
         
         # if x < self.x_target:
         #     distance_x = np.clip((x/self.x_target) - 1, -1, 0)
@@ -321,9 +290,6 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             velocity_y = self.rng.normal(velocity_y, 6.0)
             omega = self.rng.normal(omega, 0.06)
             alpha = self.rng.normal(alpha, 0.008)
-            left_thrust = self.rng.normal(left_thrust, 5)
-            right_thrust = self.rng.normal(right_thrust, 5)
-
 
         # medium sensor noise is set to around 1% of full scale    
         if medium_sensor_noise:
@@ -333,8 +299,6 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             velocity_y = self.rng.normal(velocity_y, 13.3)
             omega = self.rng.normal(omega, 0.11)
             alpha = self.rng.normal(alpha, 0.0157)
-            left_thrust = self.rng.normal(left_thrust, 10)
-            right_thrust = self.rng.normal(right_thrust, 10)
         
         # high sensor noise is set to around 5% of full scale
         if high_sensor_noise:
@@ -344,10 +308,8 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             velocity_y = self.rng.normal(velocity_y, 66.5)
             omega = self.rng.normal(omega, 0.6)
             alpha = self.rng.normal(alpha, 0.08)
-            left_thrust = self.rng.normal(left_thrust, 50)
-            right_thrust = self.rng.normal(right_thrust, 50)
 
-        return np.array([velocity_x, velocity_y, omega, alpha, x, y, left_thrust, right_thrust])
+        return np.array([velocity_x, velocity_y, omega, alpha, x, y])
 
     def render(self, mode='human', close=False):
         if self.render_sim is False: return
