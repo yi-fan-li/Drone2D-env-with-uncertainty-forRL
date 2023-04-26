@@ -114,7 +114,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Defining spaces for action and observation
         min_action = np.array([0, 0], dtype=int)
         max_action = np.array([2, 2], dtype=int)
-        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=int)
+        self.action_space = spaces.Tuple((spaces.Discrete(3), spaces.Discrete(3)))
         
         # observation space (velocity_x, velocity_y, angular velocity, angle, x, y )
         min_observation = np.array([-np.inf, -np.inf, -np.inf, -np.pi, -np.inf, -np.inf], dtype=np.float64)

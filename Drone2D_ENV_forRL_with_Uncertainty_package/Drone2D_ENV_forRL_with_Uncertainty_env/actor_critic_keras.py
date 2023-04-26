@@ -1,6 +1,6 @@
 # multi-layer perceptron actor-critic agent (for reference)
 # https://keras.io/examples/rl/actor_critic_cartpole/
-import gym
+import gymnasium as gym
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -57,7 +57,7 @@ while True:  # Run until solved
             action_probs_history.append(tf.math.log(action_probs[0, action]))
 
             # Apply the sampled action in our environment
-            state, reward, done, _ = env.step(action)
+            state, reward, terminated, truncated, _ = env.step(action)
             rewards_history.append(reward)
             episode_reward += reward
             # append data
@@ -66,7 +66,7 @@ while True:  # Run until solved
                      , reward, action))
             prev_state = state
 
-            if done:
+            if terminated or truncated:
                 break
         # convert data to numpy array
         dataset = np.array(data)
