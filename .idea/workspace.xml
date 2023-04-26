@@ -5,9 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="07285042-0527-4cce-a3e3-083e4fc33d13" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Drone2D_ENV_forRL_with_Uncertainty_package/Actor_critic.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Drone2D_ENV_forRL_with_Uncertainty_package/Drone2D_ENV_forRL_with_Uncertainty_env/Actor_critic.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Drone2D_ENV_forRL_with_Uncertainty_package/Drone2D_ENV_forRL_with_Uncertainty_package.egg-info/SOURCES.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Drone2D_ENV_forRL_with_Uncertainty_package/Drone2D_ENV_forRL_with_Uncertainty_package.egg-info/SOURCES.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,11 +36,14 @@
   "keyToString": {
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "last_opened_file_path": "C:/Users/junch/Documents/GitHub/Drone2D-env-with-uncertainty-forRL",
+    "last_opened_file_path": "C:/Users/junch/Documents/Winter 2023/COMP 579/Final",
     "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
   }
 }]]></component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\junch\Documents\Winter 2023\COMP 579\Final" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\junch\Documents\GitHub\Drone2D-env-with-uncertainty-forRL\Drone2D_ENV_forRL_with_Uncertainty_package" />
       <recent name="C:\Users\junch\Documents\GitHub\Drone2D-env-with-uncertainty-forRL\Drone2D_ENV_forRL_with_Uncertainty_package\Drone2D_ENV_forRL_with_Uncertainty_env" />
