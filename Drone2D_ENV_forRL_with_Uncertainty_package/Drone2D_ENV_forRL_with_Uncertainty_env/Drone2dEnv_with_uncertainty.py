@@ -108,9 +108,9 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             self.wind_force = self.rng.uniform(-300,300)
 
         #Defining spaces for action and observation
-        min_action = np.array([0, 0], dtype=int)
-        max_action = np.array([2, 2], dtype=int)
-        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=int)
+        min_action = np.array([200, 200], dtype=np.float64)
+        max_action = np.array([1500, 1500], dtype=np.float64)
+        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float64)
         
         # observation space (velocity_x, velocity_y, angular velocity, angle, x, y )
         min_observation = np.array([-np.inf, -np.inf, -np.inf, -np.pi, -np.inf, -np.inf], dtype=np.float64)
