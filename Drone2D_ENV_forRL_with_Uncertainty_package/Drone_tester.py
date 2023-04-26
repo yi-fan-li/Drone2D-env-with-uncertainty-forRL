@@ -6,8 +6,6 @@ newenv = gym.make("Drone2D-Uncertain-v0", render_sim = True, Sensor_noise_level 
 
 obs, info = newenv.reset()
 
-
-obs, reward, truncated, terminated, info = newenv.step([1000,1000])
-obs, reward, truncated, terminated, info = newenv.step([1000,1000])
-
+for i in range (100):
+    obs, reward, terminated, truncated, info = newenv.step([800,700])
 print(obs)

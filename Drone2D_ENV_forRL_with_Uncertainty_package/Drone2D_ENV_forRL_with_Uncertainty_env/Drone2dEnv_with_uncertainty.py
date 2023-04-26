@@ -33,7 +33,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             render_path = False, 
             render_shade = False,
             shade_distance = 10,
-            time_in_second = 15,
+            time_in_second = 20,
             Sensor_noise_level = "none",
             Actuator_noise_level = "none",
             Environmental_disturbance = "none"
@@ -137,7 +137,8 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Generating drone's starting position
         random_x = random.uniform(200, 800)
         random_y = random.uniform(600, 800)
-        angle_rand = random.uniform(-np.pi/4, np.pi/4)
+        # angle_rand = random.uniform(-np.pi/4, np.pi/4)
+        angle_rand = 0
         self.drone = Drone.Drone_physic(random_x, random_y, angle_rand, 16, 80, 0.8, 0.4, self.space)
 
         self.drone_radius = self.drone.drone_radius
@@ -168,11 +169,17 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             left_force = rng.normal(left_force, left_force * 0.05)
             right_force = rng.normal(right_force, right_force * 0.05)
 
-        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, self.left_force), (-self.drone_radius, 0))
-        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, self.right_force), (self.drone_radius, 0))
+        # get observations
+        obs = self.get_observation()
+        velocity_x, velocity_y, angular_velocity, angle, x, y = obs
+
+        # apply the force of the observation
+        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*self.left_force, np.cos(angle)*self.left_force), (-self.drone_radius, 0))
+        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*self.right_force, np.cos(angle)*self.right_force), (self.drone_radius, 0))
 
         self.space.step(1.0/60)
         self.current_time_step += 1
+        self.render()
 
         #Saving drone's position for drawing
         if self.first_step is True:
@@ -190,16 +197,15 @@ class Drone2dEnv_with_uncertainty(gym.Env):
                 self.add_drone_shade()
 
         #Calulating reward function
-        obs = self.get_observation()
-        velocity_x, velocity_y, angular_velocity, angle, x, y = obs
 
         #Stops episode, when drone is out of range or overlaps
         out_of_control = np.abs(angle) > np.pi/2
-        out_of_bound = 0 > x > 1000 or 0 > y > 1000
+        out_of_bound = x < 0 or x > 1000 or y < 0 or y > 800
 
+        # Rewards calculation
         #Check the reward if they landed
         in_landing_zone = self.landing_target[0] < x < self.landing_target[1] and 0 < y < 16
-        reasonable_landing_speed = velocity_x < 100 and velocity_x < 100 and angular_velocity < 5
+        reasonable_landing_speed = velocity_y < 100 and velocity_y < 100 and angular_velocity < 5
 
         reward = 0
 
