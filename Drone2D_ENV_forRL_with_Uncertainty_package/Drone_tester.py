@@ -6,6 +6,6 @@ newenv = gym.make("Drone2D-Uncertain-v0", render_sim = True, Sensor_noise_level 
 
 obs, info = newenv.reset()
 
-from stable_baselines import PPO
-
-model = PPO("MlpPolicy", "CartPole-v1").learn(10_000)
+for i in range (100):
+    obs, reward, terminated, truncated, info = newenv.step([800, 900])
+print(obs)

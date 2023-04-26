@@ -39,6 +39,10 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             Environmental_disturbance = "none"
             ):
 
+        #initiate rng
+        self.rng = np.random.default_rng(50)
+
+
         self.render_sim = render_sim
         self.render_path = render_path
         self.render_shade = render_shade
@@ -63,14 +67,10 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         self.truncated = False
         self.info = {}
         self.current_time_step = 0
-        self.left_force = -1
-        self.right_force = -1
 
+        
         #Generating target position
         self.landing_target = [400,600]
-
-        #initiate rng
-        self.rng = np.random.default_rng(50)
 
 
         if self.render_sim == True:
@@ -144,11 +144,19 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Generating drone's starting position
         random_x = random.uniform(200, 800)
         random_y = random.uniform(600, 800)
-        # angle_rand = random.uniform(-np.pi/4, np.pi/4)
-        angle_rand = 0
+        angle_rand = random.uniform(-np.pi/4, np.pi/4)
+        # angle_rand = 0
         self.drone = Drone.Drone_physic(random_x, random_y, angle_rand, 16, 80, 0.8, 0.4, self.space)
 
         self.drone_radius = self.drone.drone_radius
+
+        # apply intial force
+        self.left_force = self.rng.uniform(600,800)
+        self.right_force = self.rng.uniform(600,800)
+
+        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle_rand)*self.left_force, np.cos(angle_rand)*self.left_force), (-self.drone_radius, 0))
+        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle_rand)*self.right_force, np.cos(angle_rand)*self.right_force), (self.drone_radius, 0))
+
 
     def step(self, action):
 
@@ -162,29 +170,29 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         # low sensor noise is set to around 0.5% of full scale
         if low_actuator_noise:
-            left_force = self.rng.normal(left_force, left_force * 0.005)
-            right_force = self.rng.normal(right_force, right_force * 0.005)
+            left_force = self.rng.normal(self.left_force, left_force * 0.005)
+            right_force = self.rng.normal(self.right_force, right_force * 0.005)
         
         # medium sensor noise is set to around 1% of full scale
         if medium_actuator_noise:
-            left_force = self.rng.normal(left_force, left_force * 0.01)
-            right_force = self.rng.normal(right_force, right_force * 0.01)
+            left_force = self.rng.normal(self.left_force, left_force * 0.01)
+            right_force = self.rng.normal(self.right_force, right_force * 0.01)
 
         # high sensor noise is set to around 5% of full scale
         if high_actuator_noise:
-            left_force = self.rng.normal(left_force, left_force * 0.05)
-            right_force = self.rng.normal(right_force, right_force * 0.05)
+            left_force = self.rng.normal(self.left_force, left_force * 0.05)
+            right_force = self.rng.normal(self.right_force, right_force * 0.05)
 
-        left_force = np.absolute(left_force)
-        right_force = np.absolute(right_force)
+        left_force = np.absolute(self.left_force)
+        right_force = np.absolute(self.right_force)
 
         # get observations
         obs = self.get_observation()
         velocity_x, velocity_y, angular_velocity, angle, x, y = obs
 
         # apply the force of the observation
-        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*self.left_force, np.cos(angle)*self.left_force), (-self.drone_radius, 0))
-        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*self.right_force, np.cos(angle)*self.right_force), (self.drone_radius, 0))
+        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*left_force, np.cos(angle)*left_force), (-self.drone_radius, 0))
+        self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*right_force, np.cos(angle)*right_force), (self.drone_radius, 0))
 
         #apply environmental disturbance
         constant_environmental_disturbance =  self.Environmental_disturbance == "constant"
@@ -367,35 +375,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         pygame.quit()
 
     # def initial_movement(self):
-    #     if self.initial_throw is True:
-    #         throw_angle = random.random() * 2*np.pi
-    #         throw_force = random.uniform(0, 25000)
-    #         throw = Vec2d(np.cos(throw_angle)*throw_force, np.sin(throw_angle)*throw_force)
-
-    #         self.drone.frame_shape.body.apply_force_at_world_point(throw, self.drone.frame_shape.body.position)
-
-    #         throw_rotation = random.uniform(-3000, 3000)
-    #         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, throw_rotation), (-self.drone_radius, 0))
-    #         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, -throw_rotation), (self.drone_radius, 0))
-
-    #         self.space.step(1.0/60)
-    #         if self.render_sim is True and self.render_path is True: self.add_postion_to_drop_path()
-
-    #     else:
-    #         throw_angle = None
-    #         throw_force = None
-    #         throw_rotation = None
-
-    #     initial_stabilisation_delay = self.stabilisation_delay
-    #     while self.stabilisation_delay != 0:
-    #         self.space.step(1.0/60)
-    #         if self.render_sim is True and self.render_path is True: self.add_postion_to_drop_path()
-    #         if self.render_sim is True: self.render()
-    #         self.stabilisation_delay -= 1
-
-    #     self.stabilisation_delay = initial_stabilisation_delay
-
-    #     return {'throw_angle': throw_angle, 'throw_force': throw_force, 'throw_rotation': throw_rotation}
+    #     
 
     def add_postion_to_drop_path(self):
         x, y = self.drone.frame_shape.body.position
