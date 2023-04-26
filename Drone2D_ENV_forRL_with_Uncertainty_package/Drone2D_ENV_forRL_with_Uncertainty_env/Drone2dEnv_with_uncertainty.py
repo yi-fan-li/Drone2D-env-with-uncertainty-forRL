@@ -69,6 +69,10 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Generating target position
         self.landing_target = [400,600]
 
+        #initiate rng
+        self.rng = np.random.default_rng(50)
+
+
         if self.render_sim == True:
             self.render()
 
@@ -99,11 +103,16 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         if valid_disturbance_level:
             self.Environmental_disturbance = Environmental_disturbance
         
+        constant_environmental_disturbance =  self.Environmental_disturbance == "constant"
+        if constant_environmental_disturbance:
+            self.wind_force = self.rng.uniform(-300,300)
+
+        self.left_force
 
         #Defining spaces for action and observation
-        min_action = np.array([10, 10], dtype=np.float64)
-        max_action = np.array([1000, 1000], dtype=np.float64)
-        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float64)
+        min_action = np.array([0, 0], dtype=int)
+        max_action = np.array([2, 2], dtype=int)
+        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=int)
         
         # observation space (velocity_x, velocity_y, angular velocity, angle, x, y )
         min_observation = np.array([-np.inf, -np.inf, -np.inf, -np.pi, -np.inf, -np.inf], dtype=np.float64)
@@ -149,25 +158,27 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         self.right_force = action[1]
 
         # noise simulation and seeding 
-        rng = np.random.default_rng(50)
-        low_sensor_noise = self.Actuator_noise_level == "low"
-        medium_sensor_noise = self.Actuator_noise_level == "medium"
-        high_sensor_noise = self.Actuator_noise_level == "high"
+        low_actuator_noise = self.Actuator_noise_level == "low"
+        medium_actuator_noise = self.Actuator_noise_level == "medium"
+        high_actuator_noise = self.Actuator_noise_level == "high"
 
         # low sensor noise is set to around 0.5% of full scale
-        if low_sensor_noise:
-            left_force = rng.normal(left_force, left_force * 0.005)
-            right_force = rng.normal(right_force, right_force * 0.005)
+        if low_actuator_noise:
+            left_force = self.rng.normal(left_force, left_force * 0.005)
+            right_force = self.rng.normal(right_force, right_force * 0.005)
         
         # medium sensor noise is set to around 1% of full scale
-        if medium_sensor_noise:
-            left_force = rng.normal(left_force, left_force * 0.01)
-            right_force = rng.normal(right_force, right_force * 0.01)
+        if medium_actuator_noise:
+            left_force = self.rng.normal(left_force, left_force * 0.01)
+            right_force = self.rng.normal(right_force, right_force * 0.01)
 
         # high sensor noise is set to around 5% of full scale
-        if high_sensor_noise:
-            left_force = rng.normal(left_force, left_force * 0.05)
-            right_force = rng.normal(right_force, right_force * 0.05)
+        if high_actuator_noise:
+            left_force = self.rng.normal(left_force, left_force * 0.05)
+            right_force = self.rng.normal(right_force, right_force * 0.05)
+
+        left_force = np.absolute(left_force)
+        right_force = np.absolute(right_force)
 
         # get observations
         obs = self.get_observation()
@@ -176,6 +187,17 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         # apply the force of the observation
         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*self.left_force, np.cos(angle)*self.left_force), (-self.drone_radius, 0))
         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*self.right_force, np.cos(angle)*self.right_force), (self.drone_radius, 0))
+
+        #apply environmental disturbance
+        constant_environmental_disturbance =  self.Environmental_disturbance == "constant"
+        random_environmental_disturbance = self.Environmental_disturbance == "random"
+        
+        if constant_environmental_disturbance:
+            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, self.wind_force), (self.drone_radius, 0))
+        
+        if random_environmental_disturbance:
+            random_wind_force = self.rng.uniform(-300,300)
+            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, random_wind_force), (self.drone_radius, 0))
 
         self.space.step(1.0/60)
         self.current_time_step += 1
@@ -239,8 +261,6 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         x, y = self.drone.frame_shape.body.position
         
-        # Noise simulation and rng seeding
-        rng = np.random.default_rng(50)
         # if x < self.x_target:
         #     distance_x = np.clip((x/self.x_target) - 1, -1, 0)
 
@@ -258,6 +278,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         # return np.array([velocity_x, velocity_y, omega, alpha, distance_x, distance_y, pos_x, pos_y])
 
+        # Noise simulation and rng seeding
         no_sensor_noise = self.Sensor_noise_level == "none"
         low_sensor_noise = self.Sensor_noise_level == "low"
         medium_sensor_noise = self.Sensor_noise_level == "medium"
@@ -265,30 +286,30 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         # low sensor noise is set to around 0.5% of full scale
         if low_sensor_noise:
-            x = rng.normal(x, 4.0)
-            y = rng.normal(y, 4.0)
-            velocity_x = rng.normal(velocity_x, 6.0)
-            velocity_y = rng.normal(velocity_y, 6.0)
-            omega = rng.normal(omega, 0.06)
-            alpha = rng.normal(alpha, 0.008)
+            x = self.rng.normal(x, 4.0)
+            y = self.rng.normal(y, 4.0)
+            velocity_x = self.rng.normal(velocity_x, 6.0)
+            velocity_y = self.rng.normal(velocity_y, 6.0)
+            omega = self.rng.normal(omega, 0.06)
+            alpha = self.rng.normal(alpha, 0.008)
 
         # medium sensor noise is set to around 1% of full scale    
         if medium_sensor_noise:
-            x = rng.normal(x, 8.0)
-            y = rng.normal(y, 8.0)
-            velocity_x = rng.normal(velocity_x, 13.3)
-            velocity_y = rng.normal(velocity_y, 13.3)
-            omega = rng.normal(omega, 0.11)
-            alpha = rng.normal(alpha, 0.0157)
+            x = self.rng.normal(x, 8.0)
+            y = self.rng.normal(y, 8.0)
+            velocity_x = self.rng.normal(velocity_x, 13.3)
+            velocity_y = self.rng.normal(velocity_y, 13.3)
+            omega = self.rng.normal(omega, 0.11)
+            alpha = self.rng.normal(alpha, 0.0157)
         
         # high sensor noise is set to around 5% of full scale
         if high_sensor_noise:
-            x = rng.normal(x, 40.0)
-            y = rng.normal(y, 40.0)
-            velocity_x = rng.normal(velocity_x, 66.5)
-            velocity_y = rng.normal(velocity_y, 66.5)
-            omega = rng.normal(omega, 0.6)
-            alpha = rng.normal(alpha, 0.08)
+            x = self.rng.normal(x, 40.0)
+            y = self.rng.normal(y, 40.0)
+            velocity_x = self.rng.normal(velocity_x, 66.5)
+            velocity_y = self.rng.normal(velocity_y, 66.5)
+            omega = self.rng.normal(omega, 0.6)
+            alpha = self.rng.normal(alpha, 0.08)
 
         return np.array([velocity_x, velocity_y, omega, alpha, x, y])
 
@@ -313,14 +334,14 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Drawing vectors of motor forces
         vector_scale = 0.05
         l_x_1, l_y_1 = self.drone.frame_shape.body.local_to_world((-self.drone_radius, 0))
-        l_x_2, l_y_2 = self.drone.frame_shape.body.local_to_world((-self.drone_radius, 1000*vector_scale))
+        l_x_2, l_y_2 = self.drone.frame_shape.body.local_to_world((-self.drone_radius, 1500*vector_scale))
         pygame.draw.line(self.screen, (179,179,179), (l_x_1, 800-l_y_1), (l_x_2, 800-l_y_2), 4)
 
         l_x_2, l_y_2 = self.drone.frame_shape.body.local_to_world((-self.drone_radius, self.left_force*vector_scale))
         pygame.draw.line(self.screen, (255,0,0), (l_x_1, 800-l_y_1), (l_x_2, 800-l_y_2), 4)
 
         r_x_1, r_y_1 = self.drone.frame_shape.body.local_to_world((self.drone_radius, 0))
-        r_x_2, r_y_2 = self.drone.frame_shape.body.local_to_world((self.drone_radius, 1000*vector_scale))
+        r_x_2, r_y_2 = self.drone.frame_shape.body.local_to_world((self.drone_radius, 1500*vector_scale))
         pygame.draw.line(self.screen, (179,179,179), (r_x_1, 800-r_y_1), (r_x_2, 800-r_y_2), 4)
 
         r_x_2, r_y_2 = self.drone.frame_shape.body.local_to_world((self.drone_radius, self.right_force*vector_scale))
