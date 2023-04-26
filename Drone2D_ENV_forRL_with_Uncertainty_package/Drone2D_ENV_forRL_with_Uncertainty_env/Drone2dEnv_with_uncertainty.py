@@ -148,8 +148,8 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         #Generating drone's starting position
         random_x = random.uniform(200, 800)
         random_y = random.uniform(600, 800)
-        # angle_rand = random.uniform(-np.pi/4, np.pi/4)
-        angle_rand = 0
+        angle_rand = random.uniform(-np.pi/4, np.pi/4)
+        # angle_rand = 0
         self.drone = Drone.Drone_physic(random_x, random_y, angle_rand, 16, 80, 0.8, 0.4, self.space)
 
         self.drone_radius = self.drone.drone_radius
@@ -168,18 +168,20 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         left_thrust_inside_downlimit = self.left_force > 205
         right_thrust_inside_uplimit = self.right_force < 1405
         right_thrust_inside_downlimit = self.right_force > 205
+        
+        increment = 50
 
         if left_up_thrust and left_thrust_inside_uplimit:
-            self.left_force += 100
+            self.left_force += increment
         
         if left_down_thrust and left_thrust_inside_downlimit:
-            self.left_force -= 100
+            self.left_force -= increment
         
         if right_up_thrust and right_thrust_inside_uplimit:
-            self.right_force += 100
+            self.right_force += increment
 
         if right_down_thrust and right_thrust_inside_downlimit:
-            self.right_force -= 100
+            self.right_force -= increment
 
         # noise simulation and seeding 
         low_actuator_noise = self.Actuator_noise_level == "low"
