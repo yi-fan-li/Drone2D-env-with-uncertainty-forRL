@@ -1,5 +1,5 @@
 setup.py
-Drone2D_ENV_forRL_with_Uncertainty_env/Drone_2DEnv_with_uncertainty.py
+Drone2D_ENV_forRL_with_Uncertainty_env/Drone2dEnv_with_uncertainty.py
 Drone2D_ENV_forRL_with_Uncertainty_env/Drone_physic.py
 Drone2D_ENV_forRL_with_Uncertainty_env/Event_handler.py
 Drone2D_ENV_forRL_with_Uncertainty_env/__init__.py

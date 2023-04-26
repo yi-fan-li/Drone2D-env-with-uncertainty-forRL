@@ -67,7 +67,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         self.right_force = -1
 
         #Generating target position
-        self.landing_target = [300,500]
+        self.landing_target = [400,600]
 
         if self.render_sim == True:
             self.render()
@@ -112,7 +112,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
     def init_pygame(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((800, 800))
+        self.screen = pygame.display.set_mode((1000, 800))
         pygame.display.set_caption("Drone2d Environment")
         self.clock = pygame.time.Clock()
 
@@ -135,7 +135,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             pymunk.pygame_util.positive_y_is_up = True
 
         #Generating drone's starting position
-        random_x = random.uniform(200, 600)
+        random_x = random.uniform(200, 800)
         random_y = random.uniform(600, 800)
         angle_rand = random.uniform(-np.pi/4, np.pi/4)
         self.drone = Drone.Drone_physic(random_x, random_y, angle_rand, 16, 80, 0.8, 0.4, self.space)
@@ -195,7 +195,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         #Stops episode, when drone is out of range or overlaps
         out_of_control = np.abs(angle) > np.pi/2
-        out_of_bound = 0 > x > 800 or 0 > y > 800
+        out_of_bound = 0 > x > 1000 or 0 > y > 1000
 
         #Check the reward if they landed
         in_landing_zone = self.landing_target[0] < x < self.landing_target[1] and 0 < y < 16
@@ -291,9 +291,9 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         Event_handler.pygame_events(self.space, self)
         self.screen.fill((243, 243, 243))
-        pygame.draw.rect(self.screen, (24, 114, 139), pygame.Rect(0, 0, 800, 800), 8)
-        pygame.draw.rect(self.screen, (33, 158, 188), pygame.Rect(50, 50, 700, 700), 4)
-        pygame.draw.rect(self.screen, (142, 202, 230), pygame.Rect(200, 200, 400, 400), 4)
+        pygame.draw.rect(self.screen, (24, 114, 139), pygame.Rect(0, 0, 1000, 800), 8)
+        pygame.draw.rect(self.screen, (33, 158, 188), pygame.Rect(200, 0, 600, 200), 4)
+        pygame.draw.rect(self.screen, (142, 202, 230), pygame.Rect(400, 784, 200, 16), 4)
 
         #Drawing drone's shade
         if len(self.path_drone_shade):
