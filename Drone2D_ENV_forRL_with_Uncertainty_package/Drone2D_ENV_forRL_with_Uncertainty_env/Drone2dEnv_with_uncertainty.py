@@ -152,8 +152,8 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
     def step(self, action):
 
-        self.left_force = action[0]
-        self.right_force = action[1]
+        left_force = action[0]
+        right_force = action[1]
 
         # noise simulation and seeding 
         low_actuator_noise = self.Actuator_noise_level == "low"
