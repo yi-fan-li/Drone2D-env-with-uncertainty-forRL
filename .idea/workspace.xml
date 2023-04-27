@@ -253,4 +253,15 @@
       </map>
     </option>
   </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Drone2D_ENV_forRL_with_Uncertainty_package/Drone2D_ENV_forRL_with_Uncertainty_env/Drone2dEnv_with_uncertainty.py</url>
+          <line>275</line>
+          <option name="timeStamp" value="28" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
 </project>

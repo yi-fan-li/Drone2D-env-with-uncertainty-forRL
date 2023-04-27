@@ -58,7 +58,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         # Parameters
         self.max_time_steps = time_in_second * 60
         self.drone_shade_distance = shade_distance
-        # self.froce_scale = 1000
+        self.force_scale = 1200
 
 
         #Initial values
@@ -108,9 +108,9 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             self.wind_force = self.rng.uniform(-300,300)
 
         #Defining spaces for action and observation
-        min_action = np.array([200, 200], dtype=np.float64)
-        max_action = np.array([1500, 1500], dtype=np.float64)
-        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float64)
+        min_action = np.array([-1, -1], dtype=np.float32)
+        max_action = np.array([1, 1], dtype=np.float32)
+        self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float32)
         
         # observation space (velocity_x, velocity_y, angular velocity, angle, x, y )
         min_observation = np.array([-np.inf, -np.inf, -np.inf, -np.pi, -np.inf, -np.inf], dtype=np.float64)
@@ -160,31 +160,36 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
     def step(self, action):
 
-        left_force = action[0]
-        right_force = action[1]
+        self.left_force = (action[0]/2+0.6)*self.force_scale
+        self.right_force = (action[1]/1+0.6)*self.force_scale
 
-        # noise simulation and seeding 
+        # noise simulation and seeding
+        no_actuator_noise = self.Actuator_noise_level == "none"
         low_actuator_noise = self.Actuator_noise_level == "low"
         medium_actuator_noise = self.Actuator_noise_level == "medium"
         high_actuator_noise = self.Actuator_noise_level == "high"
 
         # low sensor noise is set to around 0.5% of full scale
+        if no_actuator_noise:
+            left_force = self.left_force
+            right_force = self.right_force
+
         if low_actuator_noise:
-            left_force = self.rng.normal(self.left_force, left_force * 0.005)
-            right_force = self.rng.normal(self.right_force, right_force * 0.005)
+            left_force = self.rng.normal(self.left_force, self.left_force * 0.005)
+            right_force = self.rng.normal(self.right_force, self.right_force * 0.005)
         
         # medium sensor noise is set to around 1% of full scale
         if medium_actuator_noise:
-            left_force = self.rng.normal(self.left_force, left_force * 0.01)
-            right_force = self.rng.normal(self.right_force, right_force * 0.01)
+            left_force = self.rng.normal(self.left_force, self.left_force * 0.01)
+            right_force = self.rng.normal(self.right_force, self.right_force * 0.01)
 
         # high sensor noise is set to around 5% of full scale
         if high_actuator_noise:
-            left_force = self.rng.normal(self.left_force, left_force * 0.05)
-            right_force = self.rng.normal(self.right_force, right_force * 0.05)
+            left_force = self.rng.normal(self.left_force, self.left_force * 0.05)
+            right_force = self.rng.normal(self.right_force, self.right_force * 0.05)
 
-        left_force = np.absolute(self.left_force)
-        right_force = np.absolute(self.right_force)
+        left_force = np.absolute(left_force)
+        right_force = np.absolute(right_force)
 
         # get observations
         obs = self.get_observation()
@@ -226,27 +231,43 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         #Calulating reward function
 
+        x_dist = (500 - x)**2
+        y_dist = y**2
+        euclid_dist = np.sqrt(x_dist + y_dist)
+        reward_dist = 10/(euclid_dist+1)
+
+        reward_angle = -5 * abs(angle)
+        # reward_speed = 50/abs(velocity_x + 1) + 50/abs(velocity_y + 1)
+        reward_speed = -(abs(velocity_x) + abs(velocity_y))/200
+
+        # reward_thrust = -(left_force + right_force)/60000
+
+
         #Stops episode, when drone is out of range or overlaps
         out_of_control = np.abs(angle) > np.pi/2
-        out_of_bound = x < 0 or x > 1000 or y < 0 or y > 800
+        out_of_bound = x < 0 or x > 1000 or y > 800
+        crashing = y < 8
 
         # Rewards calculation
         #Check the reward if they landed
         in_landing_zone = self.landing_target[0] < x < self.landing_target[1] and 0 < y < 16
-        reasonable_landing_speed = velocity_y < 100 and velocity_y < 100 and angular_velocity < 5
+        reasonable_landing_speed = abs(velocity_x) < 10 and abs(velocity_y) < 10 and abs(angular_velocity) < 0.2
 
-        reward = 0
+        # reward = reward_dist + reward_angle + reward_speed + reward_thrust
+        reward = reward_dist + reward_angle + reward_speed
 
         if out_of_control or out_of_bound:
             self.terminated = True
-            reward = -10
+            reward -= 100
 
-        elif in_landing_zone:
-            reward = 10
+        elif in_landing_zone and reasonable_landing_speed:
+            reward += 100
             self.terminated = True
-        
-        if not reasonable_landing_speed and in_landing_zone and not (out_of_control or out_of_bound):
-            reward -= 5
+
+        if not reasonable_landing_speed and crashing:
+            reward -= 100
+            self.terminated = True
+
             
         #Stops episode, when time is up
         if self.current_time_step == self.max_time_steps:
