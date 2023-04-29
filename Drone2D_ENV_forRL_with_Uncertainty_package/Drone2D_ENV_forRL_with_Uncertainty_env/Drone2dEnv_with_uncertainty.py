@@ -70,7 +70,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
         
         #Generating target position
-        self.landing_target = [400,600]
+        self.landing_target = [300,700]
 
 
         if self.render_sim == True:
@@ -198,6 +198,14 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         obs = self.get_observation()
         velocity_x, velocity_y, angular_velocity, angle, x, y = obs
 
+        # scale back up to normal units:
+        velocity_x = velocity_x * 1330
+        velocity_y = velocity_y * 1330
+        angular_velocity = angular_velocity * 11.7
+        angle = angle * np.pi/2
+        x = x * 1000
+        y = y * 800
+
         # apply the force of the observation
         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*left_force, np.cos(angle)*left_force), (-self.drone_radius, 0))
         self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(- np.sin(angle)*right_force, np.cos(angle)*right_force), (self.drone_radius, 0))
@@ -237,28 +245,29 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         x_dist = (500 - x)**2
         y_dist = y**2
         euclid_dist = np.sqrt(x_dist + y_dist)
-        reward_dist = 10/(euclid_dist+1)
+        reward_dist = 25/(euclid_dist+1)
 
         reward_angle = -1 * abs(angle)
         # reward_speed = 50/abs(velocity_x + 1) + 50/abs(velocity_y + 1)
         # reward_speed = -(abs(velocity_x) + abs(velocity_y))/200
         reward_speed = 5 / (abs(velocity_x) + abs(velocity_y) + 1)
 
-        reward_thrust = -(left_force + right_force)/60000
+        reward_thrust = -(left_force + right_force)/10000
 
 
         #Stops episode, when drone is out of range or overlaps
         out_of_control = np.abs(angle) > np.pi/2
         out_of_bound = x < 0 or x > 1000 or y > 800
-        crashing = y < 8
+        landing = y < 20
 
         # Rewards calculation
         #Check the reward if they landed
-        in_landing_zone = self.landing_target[0] < x < self.landing_target[1] and 0 < y < 16
-        reasonable_landing_speed = abs(velocity_x) < 10 and abs(velocity_y) < 10 and abs(angular_velocity) < 0.2
+        in_landing_zone = self.landing_target[0] < x < self.landing_target[1] and 0 < y < 20
+        reasonable_landing_speed = abs(velocity_x) < 50 and abs(velocity_y) < 50 and abs(angular_velocity) < 0.5
 
         # reward = reward_dist
-        reward = reward_dist + reward_angle 
+        # reward = reward_dist + reward_angle 
+        reward = reward_dist + reward_angle + reward_thrust
         # reward = reward_dist + reward_angle + reward_speed + reward_thrust
         # reward = reward_dist + reward_angle + reward_speed
 
@@ -267,11 +276,15 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             reward -= 100
 
         elif in_landing_zone and reasonable_landing_speed:
-            reward += 100
+            reward += 50
             self.terminated = True
 
-        if not reasonable_landing_speed and crashing:
+        if not reasonable_landing_speed and landing:
             reward -= 100
+            self.terminated = True
+        
+        if reasonable_landing_speed and landing:
+            reward += 50
             self.terminated = True
 
             
@@ -344,6 +357,15 @@ class Drone2dEnv_with_uncertainty(gym.Env):
             omega = self.rng.normal(omega, 0.6)
             alpha = self.rng.normal(alpha, 0.08)
 
+
+        # scaling the data
+        x = x/1000
+        y = y/800
+        velocity_x = np.clip(velocity_x/1330, -1, 1)
+        velocity_y = np.clip(velocity_y/1330, -1, 1)
+        omega = np.clip(omega/11.7, -1, 1)
+        alpha = np.clip(alpha/(np.pi/2), -1, 1)
+
         return np.array([velocity_x, velocity_y, omega, alpha, x, y])
 
     def render(self, mode='human', close=False):
@@ -353,7 +375,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         self.screen.fill((243, 243, 243))
         pygame.draw.rect(self.screen, (24, 114, 139), pygame.Rect(0, 0, 1000, 800), 8)
         pygame.draw.rect(self.screen, (33, 158, 188), pygame.Rect(200, 0, 600, 200), 4)
-        pygame.draw.rect(self.screen, (142, 202, 230), pygame.Rect(400, 784, 200, 16), 4)
+        pygame.draw.rect(self.screen, (142, 202, 230), pygame.Rect(300, 780, 400, 20), 4)
 
         #Drawing drone's shade
         if len(self.path_drone_shade):
