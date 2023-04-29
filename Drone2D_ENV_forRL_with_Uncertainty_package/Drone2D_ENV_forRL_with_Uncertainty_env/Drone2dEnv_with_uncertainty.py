@@ -58,7 +58,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         # Parameters
         self.max_time_steps = time_in_second * 60
         self.drone_shade_distance = shade_distance
-        self.force_scale = 1200
+        self.force_scale = 1300
 
 
         #Initial values
@@ -160,8 +160,11 @@ class Drone2dEnv_with_uncertainty(gym.Env):
 
     def step(self, action):
 
-        self.left_force = (action[0]/2+0.6)*self.force_scale
-        self.right_force = (action[1]/1+0.6)*self.force_scale
+        self.left_force = (action[0]/2+0.5)*self.force_scale + 200
+        self.right_force = (action[1]/2+0.5)*self.force_scale + 200
+
+        # self.left_force = (action[0])*self.force_scale
+        # self.right_force = (action[1])*self.force_scale
 
         # noise simulation and seeding
         no_actuator_noise = self.Actuator_noise_level == "none"
@@ -236,11 +239,12 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         euclid_dist = np.sqrt(x_dist + y_dist)
         reward_dist = 10/(euclid_dist+1)
 
-        reward_angle = -5 * abs(angle)
+        reward_angle = -1 * abs(angle)
         # reward_speed = 50/abs(velocity_x + 1) + 50/abs(velocity_y + 1)
-        reward_speed = -(abs(velocity_x) + abs(velocity_y))/200
+        # reward_speed = -(abs(velocity_x) + abs(velocity_y))/200
+        reward_speed = 5 / (abs(velocity_x) + abs(velocity_y) + 1)
 
-        # reward_thrust = -(left_force + right_force)/60000
+        reward_thrust = -(left_force + right_force)/60000
 
 
         #Stops episode, when drone is out of range or overlaps
@@ -253,8 +257,10 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         in_landing_zone = self.landing_target[0] < x < self.landing_target[1] and 0 < y < 16
         reasonable_landing_speed = abs(velocity_x) < 10 and abs(velocity_y) < 10 and abs(angular_velocity) < 0.2
 
+        # reward = reward_dist
+        reward = reward_dist + reward_angle 
         # reward = reward_dist + reward_angle + reward_speed + reward_thrust
-        reward = reward_dist + reward_angle + reward_speed
+        # reward = reward_dist + reward_angle + reward_speed
 
         if out_of_control or out_of_bound:
             self.terminated = True
