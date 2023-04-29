@@ -106,6 +106,7 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         constant_environmental_disturbance =  self.Environmental_disturbance == "constant"
         if constant_environmental_disturbance:
             self.wind_force = self.rng.uniform(-300,300)
+            print(self.wind_force)
 
         #Defining spaces for action and observation
         min_action = np.array([-1, -1], dtype=np.float32)
@@ -215,11 +216,11 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         random_environmental_disturbance = self.Environmental_disturbance == "random"
         
         if constant_environmental_disturbance:
-            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, self.wind_force), (self.drone_radius, 0))
+            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, self.wind_force), (0, 0))
         
         if random_environmental_disturbance:
             random_wind_force = self.rng.uniform(-300,300)
-            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, random_wind_force), (self.drone_radius, 0))
+            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, random_wind_force), (0, 0))
 
         self.space.step(1.0/60)
         self.current_time_step += 1
@@ -245,12 +246,12 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         x_dist = (500 - x)**2
         y_dist = y**2
         euclid_dist = np.sqrt(x_dist + y_dist)
-        reward_dist = 25/(euclid_dist+1)
+        reward_dist = 1/(euclid_dist+1)
 
         reward_angle = -1 * abs(angle)
         # reward_speed = 50/abs(velocity_x + 1) + 50/abs(velocity_y + 1)
         # reward_speed = -(abs(velocity_x) + abs(velocity_y))/200
-        reward_speed = 5 / (abs(velocity_x) + abs(velocity_y) + 1)
+        # reward_speed = 5 / (abs(velocity_x) + abs(velocity_y) + 1)
 
         reward_thrust = -(left_force + right_force)/10000
 
