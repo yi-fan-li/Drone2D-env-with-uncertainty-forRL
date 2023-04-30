@@ -215,11 +215,11 @@ class Drone2dEnv_with_uncertainty(gym.Env):
         random_environmental_disturbance = self.Environmental_disturbance == "random"
         
         if constant_environmental_disturbance:
-            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, self.wind_force), (self.drone_radius, 0))
+            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(self.wind_force, 0), (0, 0))
         
         if random_environmental_disturbance:
             random_wind_force = self.rng.uniform(-300,300)
-            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(0, random_wind_force), (self.drone_radius, 0))
+            self.drone.frame_shape.body.apply_force_at_local_point(Vec2d(random_wind_force, 0), (0, 0))
 
         self.space.step(1.0/60)
         self.current_time_step += 1
